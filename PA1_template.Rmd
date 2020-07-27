@@ -2,20 +2,21 @@
 title: "Practical Machine Learning: Peer Assessment"
 author: "Bhan Lam (lactobacillusnut)"
 date: "26/07/2020"
-output: html_document
-keep_md: true
+output: 
+    html_document:
+        keep_md: true
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library (caret)
-library(lubridate)
+library(caret)
 library(dplyr)
 library(randomForest)
-library(ggplot2)
-library(rpart)
-library(rattle)
 ```
+
+## Synopsis
+
+This document builds a classification model based on the Weight Lifting Exercise dataset as detailed in the background section below. A total of 5 classes were present in the dataset, i.e. factor with 5 levels. The dataset was imputed and further preprocessed before segmenting into training (70%) and validation (30%) sets. A random forest approach with 6-fold cross validation was employed to build a classifcation model. The final random forest model used 2 variables for splitting at each tree node (mtry = 27) with 99.06% accuracy. Using the model to predict the validation set yielded an accuracy of 99.52% with 0.48% out of sample error. The result was satisfactory and was used to predict the test set with 20 observations. 
 
 ## Background: Practical Machine Learning Course Project
 
@@ -23,7 +24,7 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 
 ## Loading and preprocessing the data
 
-Firstly, download the training and test datasets. Read the datasets into a tibble. Both the <span style="color: red;">*dplyr*</span>, <span style="color: red;">*lubridate*</span>, and <span style="color: red;">*caret*</span> packages are loaded behind the scenes. 
+Firstly, download the training and test datasets. Read the datasets into a tibble. The packages <span style="color: red;">*dplyr*</span>, <span style="color: red;">*caret*</span>, and <span style="color: red;">*randomForest*</span> are loaded behind the scenes. 
 
 There are 19622 observations and 160 variables in the training dataset and 20 observations and 160 variables in the test dataset.
 
@@ -98,7 +99,7 @@ Since there is a final test set provided, we will first split the training datas
 
 ```{r seg}
 
-set.seed(98754)
+set.seed(9875)
 puretrng <- createDataPartition(trngdata$classe, p=0.70, list=FALSE)
 pureTrngData <- trngdata[puretrng, ]
 valData <- trngdata[-puretrng, ]
@@ -106,19 +107,20 @@ valData <- trngdata[-puretrng, ]
 
 ## Random forest approach
 
-We start off with a random forest approach for this classification problem. Since the dataset is rather larger, we adopt a 6-fold cross validation approach with an assumption that the dataset is drawn from the same distribution. The final model used 2 variables for splitting at each tree node (mtry = 2) with 99.06% accuracy.
+We start off with a random forest approach for this classification problem. Since the dataset is rather larger, we adopt a 6-fold cross validation approach with an assumption that the dataset is drawn from the same distribution. Preprocessing to centre and scale the variables was also included. The final model used 27 variables for splitting at each tree node (mtry = 27) with 99.06% accuracy.
 
 ```{r randomForest, echo=TRUE}
-
+set.seed(99)
 cv <- trainControl(method="cv", 6) #cross validation
-rfModel <- train(classe ~ ., data=pureTrngData, method="rf", trControl=cv, ntree=250)
+rfModel <- train(classe ~ ., data=pureTrngData, method="rf", preProcess=c("center", "scale"), trControl=cv, ntree=250)
+rfModel
 rfModel$finalModel
 plot(rfModel)
 ```
 
 ### Validation
 
-The validation set is used to validate the trained model "rfModel". It appears that the accuracy is 99.1% and the out of sample error is 0.87%.
+The validation set is used to validate the trained model "rfModel". It appears that the accuracy is 99.52% and the out of sample error is 0.48%.
 
 ```{r validationRF}
 predictValRF <- predict(rfModel, newdata=valData)

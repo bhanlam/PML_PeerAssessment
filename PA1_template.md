@@ -11,7 +11,7 @@ output:
 
 ## Synopsis
 
-This document builds a classification model based on the Weight Lifting Exercise dataset as detailed in the background section below. A total of 5 classes were present in the dataset, i.e. factor with 5 levels. The dataset was imputed and further preprocessed before segmenting into training (70%) and validation (30%) sets. A random forest approach with 6-fold cross validation was employed to build a classifcation model. The final random forest model used 2 variables for splitting at each tree node (mtry = 2) with 99.06% accuracy. Using the model to predict the validation set yielded an accuracy of 99.1% with 0.87% out of sample error. The result was satisfactory and was used to predict the test set with 20 observations. 
+This document builds a classification model based on the Weight Lifting Exercise dataset as detailed in the background section below. A total of 5 classes were present in the dataset, i.e. factor with 5 levels. The dataset was imputed and further preprocessed before segmenting into training (70%) and validation (30%) sets. A random forest approach with 6-fold cross validation was employed to build a classifcation model. The final random forest model used 2 variables for splitting at each tree node (mtry = 27) with 99.06% accuracy. Using the model to predict the validation set yielded an accuracy of 99.52% with 0.48% out of sample error. The result was satisfactory and was used to predict the test set with 20 observations. 
 
 ## Background: Practical Machine Learning Course Project
 
@@ -19,7 +19,7 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 
 ## Loading and preprocessing the data
 
-Firstly, download the training and test datasets. Read the datasets into a tibble. Both the <span style="color: red;">*dplyr*</span>, <span style="color: red;">*lubridate*</span>, and <span style="color: red;">*caret*</span> packages are loaded behind the scenes. 
+Firstly, download the training and test datasets. Read the datasets into a tibble. The packages <span style="color: red;">*dplyr*</span>, <span style="color: red;">*caret*</span>, and <span style="color: red;">*randomForest*</span> are loaded behind the scenes. 
 
 There are 19622 observations and 160 variables in the training dataset and 20 observations and 160 variables in the test dataset.
 
@@ -238,7 +238,7 @@ Since there is a final test set provided, we will first split the training datas
 
 
 ```r
-set.seed(98754)
+set.seed(9875)
 puretrng <- createDataPartition(trngdata$classe, p=0.70, list=FALSE)
 pureTrngData <- trngdata[puretrng, ]
 ```
@@ -256,12 +256,38 @@ valData <- trngdata[-puretrng, ]
 
 ## Random forest approach
 
-We start off with a random forest approach for this classification problem. Since the dataset is rather larger, we adopt a 6-fold cross validation approach with an assumption that the dataset is drawn from the same distribution. The final model used 2 variables for splitting at each tree node (mtry = 2) with 99.06% accuracy.
+We start off with a random forest approach for this classification problem. Since the dataset is rather larger, we adopt a 6-fold cross validation approach with an assumption that the dataset is drawn from the same distribution. Preprocessing to centre and scale the variables was also included. The final model used 27 variables for splitting at each tree node (mtry = 27) with 99.06% accuracy.
 
 
 ```r
+set.seed(99)
 cv <- trainControl(method="cv", 6) #cross validation
-rfModel <- train(classe ~ ., data=pureTrngData, method="rf", trControl=cv, ntree=250)
+rfModel <- train(classe ~ ., data=pureTrngData, method="rf", preProcess=c("center", "scale"), trControl=cv, ntree=250)
+rfModel
+```
+
+```
+## Random Forest 
+## 
+## 13737 samples
+##    52 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## Pre-processing: centered (52), scaled (52) 
+## Resampling: Cross-Validated (6 fold) 
+## Summary of sample sizes: 11446, 11448, 11447, 11448, 11448, 11448, ... 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy   Kappa    
+##    2    0.9901724  0.9875670
+##   27    0.9906093  0.9881202
+##   52    0.9834750  0.9790943
+## 
+## Accuracy was used to select the optimal model using the largest value.
+## The final value used for the model was mtry = 27.
+```
+
+```r
 rfModel$finalModel
 ```
 
@@ -271,16 +297,16 @@ rfModel$finalModel
 ##  randomForest(x = x, y = y, ntree = 250, mtry = param$mtry) 
 ##                Type of random forest: classification
 ##                      Number of trees: 250
-## No. of variables tried at each split: 2
+## No. of variables tried at each split: 27
 ## 
-##         OOB estimate of  error rate: 0.68%
+##         OOB estimate of  error rate: 0.8%
 ## Confusion matrix:
 ##      A    B    C    D    E class.error
-## A 3902    3    1    0    0 0.001024066
-## B   18 2636    4    0    0 0.008276900
-## C    0   18 2376    2    0 0.008347245
-## D    0    0   38 2210    4 0.018650089
-## E    0    1    2    3 2519 0.002376238
+## A 3900    4    1    1    0 0.001536098
+## B   22 2628    7    1    0 0.011286682
+## C    0   15 2373    8    0 0.009599332
+## D    0    1   34 2215    2 0.016429840
+## E    0    0    4   10 2511 0.005544554
 ```
 
 ```r
@@ -291,7 +317,7 @@ plot(rfModel)
 
 ### Validation
 
-The validation set is used to validate the trained model "rfModel". It appears that the accuracy is 99.1% and the out of sample error is 0.87%.
+The validation set is used to validate the trained model "rfModel". It appears that the accuracy is 99.52% and the out of sample error is 0.48%.
 
 
 ```r
@@ -305,34 +331,34 @@ confMatRF
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 1673   12    0    0    0
-##          B    0 1126   12    0    0
-##          C    0    1 1013   28    1
-##          D    0    0    1  936    3
-##          E    1    0    0    0 1078
+##          A 1672    7    0    0    0
+##          B    0 1128    4    0    0
+##          C    1    4 1020    9    0
+##          D    0    0    2  955    0
+##          E    1    0    0    0 1082
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.99            
-##                  95% CI : (0.9871, 0.9924)
+##                Accuracy : 0.9952          
+##                  95% CI : (0.9931, 0.9968)
 ##     No Information Rate : 0.2845          
 ##     P-Value [Acc > NIR] : < 2.2e-16       
 ##                                           
-##                   Kappa : 0.9873          
+##                   Kappa : 0.994           
 ##                                           
 ##  Mcnemar's Test P-Value : NA              
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9994   0.9886   0.9873   0.9710   0.9963
-## Specificity            0.9972   0.9975   0.9938   0.9992   0.9998
-## Pos Pred Value         0.9929   0.9895   0.9712   0.9957   0.9991
-## Neg Pred Value         0.9998   0.9973   0.9973   0.9943   0.9992
+## Sensitivity            0.9988   0.9903   0.9942   0.9907   1.0000
+## Specificity            0.9983   0.9992   0.9971   0.9996   0.9998
+## Pos Pred Value         0.9958   0.9965   0.9865   0.9979   0.9991
+## Neg Pred Value         0.9995   0.9977   0.9988   0.9982   1.0000
 ## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
-## Detection Rate         0.2843   0.1913   0.1721   0.1590   0.1832
-## Detection Prevalence   0.2863   0.1934   0.1772   0.1597   0.1833
-## Balanced Accuracy      0.9983   0.9930   0.9906   0.9851   0.9980
+## Detection Rate         0.2841   0.1917   0.1733   0.1623   0.1839
+## Detection Prevalence   0.2853   0.1924   0.1757   0.1626   0.1840
+## Balanced Accuracy      0.9986   0.9947   0.9956   0.9951   0.9999
 ```
 
 ```r
@@ -341,7 +367,7 @@ confMatRF
 ```
 
 ```
-## [1] 0.01002549
+## [1] 0.004757859
 ```
 
 ### 20 Sample Test Set
