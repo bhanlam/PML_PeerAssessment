@@ -1,0 +1,142 @@
+---
+title: "Practical Machine Learning: Peer Assessment"
+author: "Bhan Lam (lactobacillusnut)"
+date: "26/07/2020"
+output: html_document
+keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library (caret)
+library(lubridate)
+library(dplyr)
+library(randomForest)
+library(ggplot2)
+library(rpart)
+library(rattle)
+```
+
+## Background: Practical Machine Learning Course Project
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: [link](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Loading and preprocessing the data
+
+Firstly, download the training and test datasets. Read the datasets into a tibble. Both the <span style="color: red;">*dplyr*</span>, <span style="color: red;">*lubridate*</span>, and <span style="color: red;">*caret*</span> packages are loaded behind the scenes. 
+
+There are 19622 observations and 160 variables in the training dataset and 20 observations and 160 variables in the test dataset.
+
+There are also 5 classes in the *classe* variable, namely: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Out of the 19622 observations, there are only 406 complete cases. Hence, some cleaning is required to remove missing values.
+
+```{r download}
+
+# download file
+if(!file.exists("pml-training.csv")) 
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-training.csv")
+if(!file.exists("pml-testing.csv")) 
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml-testing.csv")
+
+# show dimensions
+trngdataOrg <- tbl_df(read.csv("pml-training.csv")) 
+dim(trngdataOrg)
+
+testdataOrg <- tbl_df(read.csv("pml-testing.csv")) 
+dim(testdataOrg)
+
+names(trngdataOrg) #All 160 Variables
+unique(trngdataOrg$classe) #Number of classes
+ccases <- sum(complete.cases(trngdataOrg)) #number of complete cases
+```
+
+### Imputing data
+
+The training data is subsetted to remove unnecessary variables or those with missing data. There are 67 variables that only contain non-NA values at 406 complete cases observations. These would be removed from the training dataset. It also appears that the first seven variables are not related to the data obatined from the sensors. Both the training and test dataset are subsetted such that both datasets contain the same set of 85 variables (except for the classe variable in the test dataset).
+
+```{r subsetting}
+
+#number of variables with NA values for all observations except the complete cases
+sum(colSums(is.na(trngdataOrg))==19622-ccases) 
+
+trngdata <- trngdataOrg[, -c(1:7)] #remove first 7 variables
+testdata <- testdataOrg[, -c(1:7)] #remove first 7 variables
+
+trngdata <- trngdata %>%
+    select(which(colSums(is.na(.)) == 0))
+
+subsettedVar <- names(trngdata)[1:85] #select all except classe variable
+
+testdata <- testdata %>%
+    select(subsettedVar) #subset test dataset to the same variable 
+
+#check if the variables in both datasets are the same
+sum(names(trngdata) %in% names(testdata))
+
+```
+
+### Near Zero Variance
+
+In a further step, there are 33 variables with near zero variance, which would also be removed from the training and test sets. The resultant traning set would consist of 53 variables (52 in test set).
+
+```{r nzv}
+
+nzvVec <- nearZeroVar(trngdata, saveMetrics=TRUE)$nzv
+
+#nvariables with near zero variances
+names(trngdata)[nzvVec]
+
+trngdata <- trngdata[, !nzvVec] #remove 33 nzv variables
+testdata <- testdata[, !nzvVec[1:85]] #remove 33 nzv variables
+
+```
+
+### Data Segmentation
+
+Since there is a final test set provided, we will first split the training dataset into pure training (70%) and a validation set (30%).
+
+```{r seg}
+
+set.seed(98754)
+puretrng <- createDataPartition(trngdata$classe, p=0.70, list=FALSE)
+pureTrngData <- trngdata[puretrng, ]
+valData <- trngdata[-puretrng, ]
+```
+
+## Random forest approach
+
+We start off with a random forest approach for this classification problem. Since the dataset is rather larger, we adopt a 6-fold cross validation approach with an assumption that the dataset is drawn from the same distribution. The final model used 2 variables for splitting at each tree node (mtry = 2) with 99.06% accuracy.
+
+```{r randomForest, echo=TRUE}
+
+cv <- trainControl(method="cv", 6) #cross validation
+rfModel <- train(classe ~ ., data=pureTrngData, method="rf", trControl=cv, ntree=250)
+rfModel$finalModel
+plot(rfModel)
+```
+
+### Validation
+
+The validation set is used to validate the trained model "rfModel". It appears that the accuracy is 99.1% and the out of sample error is 0.87%.
+
+```{r validationRF}
+predictValRF <- predict(rfModel, newdata=valData)
+confMatRF <- confusionMatrix(predictValRF, as.factor(valData$classe))
+confMatRF
+
+#out of sample error
+1-as.numeric(confMatRF$overall[1])
+
+```
+
+### 20 Sample Test Set
+
+Hence the 20 sample test set is predicted as follows.
+
+```{r predictTestRF}
+predictTestRF <- predict(rfModel, testdata)
+predictTestRF
+
+```
+
